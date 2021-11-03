@@ -1,0 +1,480 @@
+---
+title: "Projet conceptions des étudiants sur enseigner - apprendre"
+subtitle: "Rapport préliminaire"
+author: "Philippe Gay & Nicolas Bressoud"
+date: "`r format(Sys.time(), '%d.%m.%Y')`"
+toc-title: "Table des matières"
+output:
+#  officedown::rdocx_document:
+#    reference_docx: "template2.docx"
+#    toc: true
+#    toc_depth: 1
+params:
+  save: false # génère des xlsx des données pour sauvegarde si true
+  cua: 725354 # code survey cua
+  url_survey: "https://sondage.competences-emotionnelles.ch/admin/remotecontrol"
+  login_survey: nbr_low
+  pass_survey: 82BBdJyTjqzz
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE)
+
+library(knitr)
+library(tidyverse)
+library(lubridate)
+library(rio)
+library(readxl)
+library(ggrepel) # pour les labels des plots
+library(limer)
+
+# Acquisition des données
+
+options(lime_api = params$url_survey)
+options(lime_username = params$login_survey)
+options(lime_password = params$pass_survey)
+
+# log in
+get_session_key()
+
+# data
+
+responses <- get_responses(params$cua, sResponseType = "short")  
+d <- responses
+
+#log out
+release_session_key()
+
+
+
+# Contexte et organisation
+
+## Auteurs
+
+## Méthodologie
+
+## Echelles
+
+
+
+```
+
+# Description du projet
+
+Permettre aux étudiants d'entrevoir la complexité des termes « enseigner et apprendre » et donner l'occasion d'un premier échange.
+
+
+# Données
+
+description de la méthode de traitement.
+
+<!-- tu peux faire ton clean data dans le chunk ci-dessous. -->
+
+```{r clean, include=FALSE}
+# le travail se fait à partir de d
+
+# load fct & libr
+source(file="~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RFct/meanScoreDf.fct.R")
+source(file="~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RFct/convScoreDf.fct.R")
+source(file="~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RFct/alphaDf.fct.R")
+source("~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RFct/corTestDf.fct.R")
+source("~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RFct/formCor.fct.R")
+
+load(file="~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RShare/cuaParam.df")
+load(file="~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RShare/cecParam.df")
+load(file="~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RShare/tsesParam.df")
+load(file="~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RShare/capParam.df")
+load(file="~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RShare/tesParam.df")
+load(file="~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RShare/metParam.df")
+load(file="~/OneDrive - HEP Vaud/1_Recherche_HEPL/WoRk/R/Work/Lib/RShare/tipParam.df")
+
+library(corrplot)
+library(psych)
+library(ggplot2)
+
+
+library(ggdist)
+library(gghalves)    
+library(rcartocolor) 
+
+## colour theme
+my_pal <- rcartocolor::carto_pal(n = 8, name = "Bold")[c(1, 3, 7, 2, 5)]
+
+# préparation des données et des scores
+
+# supprimer les "points" et renommer les variables
+d <- d %>% 
+    rename_with(~ gsub('[[:punct:]]$', '', .x)) %>% 
+    rename_with(~ gsub('[[:punct:]]', '_', .x)) %>%
+    select(!c("lastpage","seed","startdate","submitdate",)) %>% 
+    rename(lan = startlanguage, dat = datestamp)
+
+# supprimer les 1 premiers participants
+#d <- d[-c(1),]
+#d <- d %>% 
+#    filter(can=="ne")
+
+
+#info
+info.df <- d[1:11]
+info.df$id <- as.factor(info.df$id)
+info.df$lan <- as.factor(info.df$lan)
+info.df$dat <- as.factor(info.df$dat)
+info.df$pro <- as.factor(info.df$pro)
+info.df$sex <- as.factor(info.df$sex)
+info.df$can <- as.factor(info.df$can)
+info.df$sec <- as.factor(info.df$sec)
+summary(info.df)
+
+#cua
+cua.df <- d[12:31]
+min(cua.df, na.rm=T); max(cua.df, na.rm=T)
+convScoreDf.fct(cua.df, cuaParam.df$cuaParamG, 1, 4) -> cuaQConv.df
+meanScoreDf.fct(cuaQConv.df, cuaParam.df) -> cuaVD.df
+names(cuaVD.df) <- c("G","Engagement et participation", "Représentation", "Action et expression", "Evolution enseignement")
+
+summary(cuaVD.df)
+
+
+#cec (empathie)
+cec.df <- d[32:49]
+min(cec.df, na.rm=T); max(cec.df, na.rm=T)
+convScoreDf.fct(cec.df, cecParam.df$cecParamG, 1, 5) -> cecQConv.df
+meanScoreDf.fct(cecQConv.df, cecParam.df) -> cecVD.df
+names(cecVD.df) <- c("G", "Contagion", "Empathie", "Coupure")
+summary(cecVD.df)
+
+
+#tses
+tses.df <- d[50:61]
+min(tses.df, na.rm=T); max(tses.df, na.rm=T)
+convScoreDf.fct(tses.df, tsesParam.df$tsesParamG, 1, 9) -> tsesQConv.df
+meanScoreDf.fct(tsesQConv.df, tsesParam.df) -> tsesVD.df
+names(tsesVD.df) <- c("G","Engager des élèves", "Mettre en place des stratégies d'apprentissage", "Gérer la classe")
+
+
+#cap
+cap.df <- d[62:71]
+min(cap.df, na.rm=T); max(cap.df, na.rm=T)
+convScoreDf.fct(cap.df, capParam.df$capParamG, 1, 6) -> capQConv.df
+meanScoreDf.fct(capQConv.df, capParam.df) -> capVD.df
+names(capVD.df) <- c("G", "Simple-complexe", "Innée-acquis", "Conv-div")
+summary(cap.df)
+
+
+#tes
+tes.df <- d[72:83]
+min(tes.df, na.rm=T); max(tes.df, na.rm=T)
+convScoreDf.fct(tes.df, tesParam.df$tesParamG, 1, 4) -> tesQConv.df
+meanScoreDf.fct(tesQConv.df, tesParam.df) -> tesVD.df
+names(tesVD.df) <- c("score total d'émotions", "Joie", "Colère", "Anxiété")
+summary(tes.df)
+
+
+#met
+met.df <- d[84:93]
+min(met.df, na.rm=T); max(met.df, na.rm=T)
+convScoreDf.fct(met.df, metParam.df$metParamG, 1, 5) -> metQConv.df
+meanScoreDf.fct(metQConv.df, metParam.df) -> metVD.df
+names(metVD.df) <- c("Processus", "Contenus")
+summary(met.df)
+
+
+#tip
+tip.df <- d[94:103]
+min(tip.df, na.rm=T); max(tip.df, na.rm=T)
+convScoreDf.fct(tip.df, tipParam.df$tipParamG, 1, 7) -> tipQConv.df
+meanScoreDf.fct(tipQConv.df, tipParam.df) -> tipVD.df
+names(tipVD.df) <- c("Total", "Extraversion", "Agréabilité", "Conscience", "Stabilité", "Ouverture")
+summary(tip.df)
+
+
+
+
+
+# combine VD and describe
+
+#allVD.df <- cbind(info.df, cuaVD.df, cecVD.df, tsesVD.df, capVD.df, tesVD.df, metVD.df, tipVD.df)
+#allVD.df <- cbind(info.df, tsesVD.df, capVD.df, tesVD.df, metVD.df)
+#names(allVD.df)
+#summary(allVD.df)
+#describe(allVD.df[11:24])
+
+
+
+
+```
+
+## Echantillon et description
+
+<!-- A partir d'ici, on génère des sorties "propres". -->
+
+
+
+
+```{r sample}
+# alpha
+round(alphaDf.fct(cov(cuaQConv.df, use="pairwise"), cuaParam.df), 2)
+round(alphaDf.fct(cov(cecQConv.df, use="pairwise"), cecParam.df), 2)
+round(alphaDf.fct(cov(tsesQConv.df, use="pairwise"), tsesParam.df), 2)
+round(alphaDf.fct(cov(capQConv.df, use="pairwise"), capParam.df), 2)
+round(alphaDf.fct(cov(tesQConv.df, use="pairwise"), tesParam.df), 2)
+round(alphaDf.fct(cov(metQConv.df, use="pairwise"), metParam.df), 2)
+round(alphaDf.fct(cov(tipQConv.df, use="pairwise"), tipParam.df), 2)
+
+```
+
+## Agrégation
+
+### Tableaux
+
+```{r table1}
+summary(info.df)
+
+summary(cuaVD.df)
+
+#describe(allVD.df[11:24])
+```
+
+### Plots
+
+```{r plot1}
+
+## boxplot
+
+
+# cua => scores de 1à4 sur 5 items pas échelle
+mf <- stack(cuaVD.df[-1])
+ggplot(mf, aes(x = ind, y = values, fill=ind)) +     
+  geom_boxplot(notch = TRUE, alpha=0.3)+
+  geom_jitter(aes(color = ind), width=0.15, alpha = 0.6) +
+  theme(legend.position = "none")+
+  labs(x = "",  y = "Moyenne",title ="Diversification...", subtitle = "...",caption = "Résultats sur 100 enseignants",alt = "Add alt text to the plot")
+
+
+# cec => scores de 1à5 sur 6 items pas échelle
+mf <- stack(cecVD.df[-1])
+ggplot(mf, aes(x = ind, y = values, fill=ind)) +     
+  geom_boxplot(notch = TRUE, alpha=0.3)+
+  geom_jitter(aes(color = ind), width=0.15, alpha = 0.6) +
+  theme(legend.position = "none")+
+  labs(x = "",  y = "Moyenne",title ="Ecoute...", subtitle = "...contagion, empathie et coupure",caption = "Résultats sur 100 enseignants",alt = "Add alt text to the plot")
+
+
+
+# t-se-s => scores de 1à9 sur 4 items pas échelle
+mf <- stack(tsesVD.df[-1])
+ggplot(mf, aes(x = ind, y = values, fill=ind)) +     
+  geom_boxplot(notch = TRUE, alpha=0.3)+
+  geom_jitter(aes(color = ind), width=0.15, alpha = 0.6) +
+  theme(legend.position = "none")+
+  labs(x = "",  y = "Moyenne",title ="Efficacité perçue pour....", subtitle = "...engager, stratégies et gérer la classe",caption = "Résultats sur 100 enseignants",alt = "Add alt text to the plot")
+
+
+# cap => scores de 1à6 sur 3-3-4 items par dim
+mf <- stack(capVD.df[-1])
+ggplot(mf, aes(x = ind, y = values, fill=ind)) +     
+  geom_boxplot(notch = TRUE, alpha=0.3)+
+  geom_jitter(aes(color = ind), width=0.15, alpha = 0.6) +
+  theme(legend.position = "none")+
+  labs(x = "",  y = "Moyenne",title ="Croyances sur l'apprentissage", subtitle = "simple (/comp), inné (/acquis) et convergent (vs. div)",caption = "Résultats sur 100 enseignants",alt = "Add alt text to the plot")
+
+
+# tes => scores de 1à4 sur 4 items pas échelle
+mf <- stack(tesVD.df[-1])
+ggplot(mf, aes(x = ind, y = values, fill=ind)) +     
+  geom_boxplot(notch = TRUE, alpha=0.3)+
+  geom_jitter(aes(color = ind), width=0.15, alpha = 0.6) +
+  theme(legend.position = "none")+
+  labs(x = "",  y = "Moyenne",title ="Emotions dans l'enseignement", subtitle = "",caption = "Résultats sur 100 enseignants",alt = "Add alt text to the plot")
+
+
+# met => scores de 1à5 sur 5 items pas échelle
+mf <- stack(metVD.df)
+ggplot(mf, aes(x = ind, y = values, fill=ind)) +     
+  geom_boxplot(notch = TRUE, alpha=0.3)+
+  geom_jitter(aes(color = ind), width=0.15, alpha = 0.6) +
+  theme(legend.position = "none")+
+  labs(x = "",  y = "Moyenne",title ="Représentations de l’enseignement", subtitle = "orientées processus et contenus",caption = "Résultats sur 100 enseignants",alt = "Add alt text to the plot")
+
+# tipi scores de 1à7 avec 2 items par échelle
+mf <- stack(tipVD.df[-1])
+ggplot(mf, aes(x = ind, y = values, fill=ind)) +     
+  geom_boxplot(notch = TRUE, alpha=0.3)+
+  geom_jitter(aes(color = ind), width=0.15, alpha = 0.6) +
+  theme(legend.position = "none")+
+  labs(x = "",  y = "Moyenne",title ="Facettes de personnalité", subtitle = "O.C.E.A.N.",caption = "Résultats sur 100 enseignants",alt = "Add alt text to the plot")
+
+
+
+
+
+
+# distribution
+#violin(cuaVD.df[-1], main="Niveaux de CUA", las=2)
+#violin(cecVD.df[-1], main="Niveaux de contagion, empathie et coupure", col=c("coral2", "lightgreen", "grey"))
+#violin(tsesVD.df[-1], main="Efficacité perçue (pour engager, stratégie et GC)", col=c("red", "blue", "green"))
+#violin(capVD.df[-1], main="Croyances sur l'apprentissage comme simple (vs. complexe), \n inné (vs. acquis) et convergent (vs. divergent)", col=c("red", "blue", "green"))
+#violin(tesVD.df[-1], main="Emotions dans l'enseignement", col=c("yellow", "red", "purple"))
+#violin(metVD.df, main="Représentations de l’enseignement orientées \n vers les processus et vers les contenus")
+#violin(tipVD.df[-1], main="Personnalité", las=2)
+
+
+
+
+
+
+
+
+# autres idées
+
+mf <- stack(cuaVD.df[-1])
+
+t <-  ggplot(mf, aes(x = forcats::fct_rev(ind), y = values, color = ind, fill = ind)) +
+  geom_boxplot(width = .2, fill = "white", size = 0.5, outlier.shape = NA, notch = T) +
+  ggdist::stat_halfeye(adjust = .33, width = .67, color = NA, position = position_nudge(x = .15)) +
+  gghalves::geom_half_point(side = "l",range_scale = .3, alpha = .5, size = .8)   +
+  coord_flip() +
+  scale_x_discrete(expand = c(.07, .07)) +
+  scale_y_continuous(breaks = 1:9) +
+  scale_color_manual(values = my_pal, guide = "none") +
+  scale_fill_manual(values = my_pal, guide = "none")   +
+  theme_light()
+
+t+  labs(x = "",  y = "", title ="Diversification...", subtitle = "", caption = "= 159", alt = "Add alt text to the plot")
+
+
+
+mf <- stack(cecVD.df[-1])
+
+t <-  ggplot(mf, aes(x = forcats::fct_rev(ind), y = values, color = ind, fill = ind)) +
+  geom_boxplot(width = .2, fill = "white", size = 0.5, outlier.shape = NA, notch = T) +
+  ggdist::stat_halfeye(adjust = .33, width = .67, color = NA, position = position_nudge(x = .15)) +
+  gghalves::geom_half_point(side = "l",range_scale = .3, alpha = .5, size = .8)   +
+  coord_flip() +
+  scale_x_discrete(expand = c(.07, .07)) +
+  scale_y_continuous(breaks = 1:9) +
+  scale_color_manual(values = my_pal, guide = "none") +
+  scale_fill_manual(values = my_pal, guide = "none")   +
+  theme_light()
+
+t+  labs(x = "",  y = "", title ="Ecoute...", subtitle = "", caption = "= 159", alt = "Add alt text to the plot")
+
+
+
+
+
+
+
+mf <- stack(tsesVD.df[-1])
+
+t <-  ggplot(mf, aes(x = forcats::fct_rev(ind), y = values, color = ind, fill = ind)) +
+  geom_boxplot(width = .2, fill = "white", size = 0.5, outlier.shape = NA, notch = T) +
+  ggdist::stat_halfeye(adjust = .33, width = .67, color = NA, position = position_nudge(x = .15)) +
+  gghalves::geom_half_point(side = "l",range_scale = .3, alpha = .5, size = .8)   +
+  coord_flip() +
+  scale_x_discrete(expand = c(.07, .07)) +
+  scale_y_continuous(breaks = 1:9) +
+  scale_color_manual(values = my_pal, guide = "none") +
+  scale_fill_manual(values = my_pal, guide = "none")   +
+  theme_light()
+
+t+  labs(x = "",  y = "", title ="Efficacité perçue", subtitle = "", caption = "= 159", alt = "Add alt text to the plot")
+
+
+
+
+
+
+
+mf <- stack(capVD.df[-1])
+
+t <-  ggplot(mf, aes(x = forcats::fct_rev(ind), y = values, color = ind, fill = ind)) +
+  geom_boxplot(width = .2, fill = "white", size = 0.5, outlier.shape = NA, notch = T) +
+  ggdist::stat_halfeye(adjust = .33, width = .67, color = NA, position = position_nudge(x = .15)) +
+  gghalves::geom_half_point(side = "l",range_scale = .3, alpha = .5, size = .8)   +
+  coord_flip() +
+  scale_x_discrete(expand = c(.07, .07)) +
+  scale_y_continuous(breaks = 1:9) +
+  scale_color_manual(values = my_pal, guide = "none") +
+  scale_fill_manual(values = my_pal, guide = "none")   +
+  theme_light()
+
+t+  labs(x = "",  y = "", title ="Croyances sur l'apprentissage", subtitle = "", caption = "= 159", alt = "Add alt text to the plot")
+
+
+
+
+
+
+
+
+mf <- stack(tesVD.df[-1])
+
+t <-  ggplot(mf, aes(x = forcats::fct_rev(ind), y = values, color = ind, fill = ind)) +
+  geom_boxplot(width = .2, fill = "white", size = 0.5, outlier.shape = NA, notch = T) +
+  ggdist::stat_halfeye(adjust = .33, width = .67, color = NA, position = position_nudge(x = .15)) +
+  gghalves::geom_half_point(side = "l",range_scale = .3, alpha = .5, size = .8)   +
+  coord_flip() +
+  scale_x_discrete(expand = c(.07, .07)) +
+  scale_y_continuous(breaks = 1:9) +
+  scale_color_manual(values = my_pal, guide = "none") +
+  scale_fill_manual(values = my_pal, guide = "none")   +
+  theme_light()
+
+t+  labs(x = "",  y = "", title ="Emotions dans l'enseignement", subtitle = "", caption = "= 159", alt = "Add alt text to the plot")
+
+
+
+
+
+
+
+
+
+mf <- stack(metVD.df)
+
+t <-  ggplot(mf, aes(x = forcats::fct_rev(ind), y = values, color = ind, fill = ind)) +
+  geom_boxplot(width = .2, fill = "white", size = 0.5, outlier.shape = NA, notch = T) +
+  ggdist::stat_halfeye(adjust = .33, width = .67, color = NA, position = position_nudge(x = .15)) +
+  gghalves::geom_half_point(side = "l",range_scale = .3, alpha = .5, size = .8)   +
+  coord_flip() +
+  scale_x_discrete(expand = c(.07, .07)) +
+  scale_y_continuous(breaks = 1:9) +
+  scale_color_manual(values = my_pal, guide = "none") +
+  scale_fill_manual(values = my_pal, guide = "none")   +
+  theme_light()
+
+t+  labs(x = "",  y = "", title ="Représentations de l’enseignement", subtitle = "", caption = "= 159", alt = "Add alt text to the plot")
+
+
+
+
+
+
+
+
+mf <- stack(tipVD.df[-1])
+
+t <-  ggplot(mf, aes(x = forcats::fct_rev(ind), y = values, color = ind, fill = ind)) +
+  geom_boxplot(width = .2, fill = "white", size = 0.5, outlier.shape = NA, notch = T) +
+  ggdist::stat_halfeye(adjust = .33, width = .67, color = NA, position = position_nudge(x = .15)) +
+  gghalves::geom_half_point(side = "l",range_scale = .3, alpha = .5, size = .8)   +
+  coord_flip() +
+  scale_x_discrete(expand = c(.07, .07)) +
+  scale_y_continuous(breaks = 1:9) +
+ scale_color_manual(values = my_pal, guide = "none") +
+  scale_fill_manual(values = my_pal, guide = "none")   +
+  theme_light()
+
+t+  labs(x = "",  y = "", title ="OCEAN", subtitle = "", caption = "N=159", alt = "Add alt text to the plot")
+
+
+
+
+
+```
+
+
+
